@@ -1,7 +1,8 @@
 """
-Accuracy Evaluation Script for CSRNet on UCF-QNRF Dataset
-==========================================================
+Accuracy Evaluation Script for CSRNet
+======================================
 Evaluates the pretrained model against ground truth annotations.
+Supports both ShanghaiTech and UCF-QNRF datasets.
 
 Metrics computed:
     - MAE  (Mean Absolute Error)
@@ -9,8 +10,17 @@ Metrics computed:
     - RMSE (Root Mean Squared Error)
 
 Usage:
-    python evaluate.py --model model_best.pth.tar --data data/UCF-QNRF_ECCV18 --split Test
-    python evaluate.py --model model_best.pth.tar --data data/UCF-QNRF_ECCV18 --split Test --max-images 10
+    # ShanghaiTech Part A (model was trained on this)
+    python evaluate.py --model model_best.pth.tar --dataset shanghai --data data/ShanghaiTech/part_A/test_data
+
+    # ShanghaiTech Part B
+    python evaluate.py --model model_best.pth.tar --dataset shanghai --data data/ShanghaiTech/part_B/test_data
+
+    # UCF-QNRF
+    python evaluate.py --model model_best.pth.tar --dataset ucf-qnrf --data data/UCF-QNRF_ECCV18 --split Test
+
+    # Quick test (limit to N images)
+    python evaluate.py --model model_best.pth.tar --dataset shanghai --data data/ShanghaiTech/part_A/test_data --max-images 10
 """
 
 import argparse
@@ -27,28 +37,54 @@ from PIL import Image
 from model import CSRNet
 
 
-def load_ground_truth(ann_path):
-    """
-    Load ground truth count from a UCF-QNRF .mat annotation file.
-    The .mat file contains 'annPoints' with shape (N, 2) — one row per head.
-    Returns the number of annotated heads.
-    """
+def load_gt_shanghaitech(ann_path):
+    """Load ground truth from ShanghaiTech .mat file.
+    Structure: image_info[0][0][0][0][0] -> (N, 2) array of head locations."""
     mat = scipy.io.loadmat(ann_path)
-    ann_points = mat['annPoints']
-    return ann_points.shape[0]
+    locations = mat['image_info'][0][0][0][0][0]
+    return locations.shape[0]
 
 
-def evaluate(model_path, data_dir, split='Test', device=None, max_images=None):
+def load_gt_ucfqnrf(ann_path):
+    """Load ground truth from UCF-QNRF .mat file.
+    Structure: annPoints -> (N, 2) array of head locations."""
+    mat = scipy.io.loadmat(ann_path)
+    return mat['annPoints'].shape[0]
+
+
+def get_image_gt_pairs(dataset, data_dir, split='Test'):
     """
-    Evaluate CSRNet on the UCF-QNRF dataset.
-
-    Args:
-        model_path: path to model checkpoint
-        data_dir:   path to UCF-QNRF_ECCV18 directory
-        split:      'Test' or 'Train'
-        device:     'cuda' or 'cpu'
-        max_images: limit number of images (for quick testing)
+    Returns list of (image_path, gt_ann_path) tuples for the given dataset.
     """
+    pairs = []
+
+    if dataset == 'shanghai':
+        # ShanghaiTech: data_dir = .../part_A/test_data (or train_data)
+        img_dir = os.path.join(data_dir, 'images')
+        gt_dir = os.path.join(data_dir, 'ground-truth')
+        image_paths = sorted(glob.glob(os.path.join(img_dir, 'IMG_*.jpg')))
+        for img_path in image_paths:
+            img_name = os.path.basename(img_path)  # IMG_1.jpg
+            gt_name = 'GT_' + img_name.replace('.jpg', '.mat')  # GT_IMG_1.mat
+            gt_path = os.path.join(gt_dir, gt_name)
+            if os.path.exists(gt_path):
+                pairs.append((img_path, gt_path))
+
+    elif dataset == 'ucf-qnrf':
+        # UCF-QNRF: data_dir = .../UCF-QNRF_ECCV18, split = Test or Train
+        split_dir = os.path.join(data_dir, split)
+        image_paths = sorted(glob.glob(os.path.join(split_dir, 'img_*.jpg')))
+        for img_path in image_paths:
+            img_name = os.path.basename(img_path)
+            ann_name = img_name.replace('.jpg', '_ann.mat')
+            ann_path = os.path.join(split_dir, ann_name)
+            if os.path.exists(ann_path):
+                pairs.append((img_path, ann_path))
+
+    return pairs
+
+
+def evaluate(model_path, dataset, data_dir, split='Test', device=None, max_images=None):
     if device is None:
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
     device = torch.device(device)
@@ -64,24 +100,24 @@ def evaluate(model_path, data_dir, split='Test', device=None, max_images=None):
     model.to(device)
     model.eval()
 
-    # Image transform
     transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406],
                              std=[0.229, 0.224, 0.225]),
     ])
 
-    # Find all images
-    split_dir = os.path.join(data_dir, split)
-    image_paths = sorted(glob.glob(os.path.join(split_dir, 'img_*.jpg')))
-
+    # Get image/GT pairs
+    pairs = get_image_gt_pairs(dataset, data_dir, split)
     if max_images is not None:
-        image_paths = image_paths[:max_images]
+        pairs = pairs[:max_images]
 
-    total = len(image_paths)
-    print(f"Evaluating on {total} images from {split_dir}...\n")
+    # Choose GT loader
+    load_gt = load_gt_shanghaitech if dataset == 'shanghai' else load_gt_ucfqnrf
 
-    # Metrics
+    total = len(pairs)
+    print(f"Dataset: {dataset.upper()}")
+    print(f"Evaluating on {total} images from {data_dir}...\n")
+
     abs_errors = []
     sq_errors = []
     results = []
@@ -89,20 +125,10 @@ def evaluate(model_path, data_dir, split='Test', device=None, max_images=None):
     print(f"{'#':>4}  {'Image':<20}  {'GT':>6}  {'Pred':>6}  {'Error':>8}  {'Time':>6}")
     print("-" * 70)
 
-    for idx, img_path in enumerate(image_paths):
+    for idx, (img_path, gt_path) in enumerate(pairs):
         img_name = os.path.basename(img_path)
+        gt_count = load_gt(gt_path)
 
-        # Ground truth
-        ann_name = img_name.replace('.jpg', '_ann.mat')
-        ann_path = os.path.join(split_dir, ann_name)
-
-        if not os.path.exists(ann_path):
-            print(f"  WARNING: Annotation not found for {img_name}, skipping.")
-            continue
-
-        gt_count = load_ground_truth(ann_path)
-
-        # Predict
         t0 = time.time()
         img = Image.open(img_path).convert('RGB')
         img_tensor = transform(img).unsqueeze(0).to(device)
@@ -111,10 +137,8 @@ def evaluate(model_path, data_dir, split='Test', device=None, max_images=None):
         pred_count = int(round(density_map.sum().item()))
         elapsed = time.time() - t0
 
-        # Error
         error = pred_count - gt_count
-        abs_error = abs(error)
-        abs_errors.append(abs_error)
+        abs_errors.append(abs(error))
         sq_errors.append(error ** 2)
         results.append({
             'image': img_name,
@@ -131,14 +155,13 @@ def evaluate(model_path, data_dir, split='Test', device=None, max_images=None):
     rmse = np.sqrt(mse)
 
     print(f"\n{'='*70}")
-    print(f"  EVALUATION RESULTS ({split} set, {len(abs_errors)} images)")
+    print(f"  EVALUATION RESULTS ({dataset.upper()}, {len(abs_errors)} images)")
     print(f"{'='*70}")
     print(f"  MAE  (Mean Absolute Error):  {mae:.2f}")
     print(f"  MSE  (Mean Squared Error):   {mse:.2f}")
     print(f"  RMSE (Root Mean Sq. Error):  {rmse:.2f}")
     print(f"{'='*70}")
 
-    # Best and worst predictions
     if results:
         sorted_by_error = sorted(results, key=lambda x: abs(x['error']))
         print(f"\n  Top 5 BEST predictions (lowest error):")
@@ -146,7 +169,7 @@ def evaluate(model_path, data_dir, split='Test', device=None, max_images=None):
             print(f"    {r['image']}: GT={r['gt']}, Pred={r['pred']}, Error={r['error']:+d}")
 
         print(f"\n  Top 5 WORST predictions (highest error):")
-        for r in sorted_by_error[-5:]:
+        for r in sorted_by_error[-5:][::-1]:
             print(f"    {r['image']}: GT={r['gt']}, Pred={r['pred']}, Error={r['error']:+d}")
 
     print()
@@ -154,15 +177,17 @@ def evaluate(model_path, data_dir, split='Test', device=None, max_images=None):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Evaluate CSRNet on UCF-QNRF dataset')
+    parser = argparse.ArgumentParser(description='Evaluate CSRNet accuracy')
     parser.add_argument('--model', '-m', required=True, help='Path to model checkpoint')
-    parser.add_argument('--data', '-d', default='data/UCF-QNRF_ECCV18', help='Path to UCF-QNRF directory')
-    parser.add_argument('--split', '-s', default='Test', choices=['Test', 'Train'], help='Dataset split')
+    parser.add_argument('--dataset', choices=['shanghai', 'ucf-qnrf'], default='shanghai',
+                        help='Dataset type: shanghai or ucf-qnrf')
+    parser.add_argument('--data', '-d', required=True, help='Path to dataset directory')
+    parser.add_argument('--split', '-s', default='Test', help='Split for UCF-QNRF (Test/Train)')
     parser.add_argument('--device', default=None, help='Device: cuda or cpu')
-    parser.add_argument('--max-images', type=int, default=None, help='Max images to evaluate (for quick test)')
+    parser.add_argument('--max-images', type=int, default=None, help='Max images to evaluate')
     args = parser.parse_args()
 
-    evaluate(args.model, args.data, args.split, args.device, args.max_images)
+    evaluate(args.model, args.dataset, args.data, args.split, args.device, args.max_images)
 
 
 if __name__ == '__main__':
