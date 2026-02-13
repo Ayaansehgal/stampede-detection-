@@ -1,0 +1,23 @@
+# Model weights (too large for GitHub)
+*.pth.tar
+*.pth
+*.h5
+
+# Dataset (too large for GitHub)
+data/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store
