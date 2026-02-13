@@ -1,23 +1,26 @@
-# Model weights (too large for GitHub)
-*.pth.tar
-*.pth
-*.h5
-
-# Dataset (too large for GitHub)
-data/
-
-# Python
+# Init
 __pycache__/
 *.pyc
-*.pyo
-*.egg-info/
-dist/
-build/
 
-# IDE
+# Data
+data/
+synthetic_data/
+synthetic_data.json
+synthetic_crowd_data.json
+*.json
+
+# Models (Large files)
+models/model_csrnet.pth
+*.pth.tar
+*.h5
+
+# Keep small models
+!models/gru_shockwave_model.pth
+!models/feature_scaler.pkl
+
+# Environment
+.env
+venv/
+env/
 .vscode/
 .idea/
-
-# OS
-Thumbs.db
-.DS_Store

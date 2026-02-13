@@ -10,16 +10,12 @@ Metrics computed:
     - RMSE (Root Mean Squared Error)
 
 Usage:
-    # ShanghaiTech Part A (model was trained on this)
     python evaluate.py --model model_best.pth.tar --dataset shanghai --data data/ShanghaiTech/part_A/test_data
 
-    # ShanghaiTech Part B
     python evaluate.py --model model_best.pth.tar --dataset shanghai --data data/ShanghaiTech/part_B/test_data
 
-    # UCF-QNRF
     python evaluate.py --model model_best.pth.tar --dataset ucf-qnrf --data data/UCF-QNRF_ECCV18 --split Test
 
-    # Quick test (limit to N images)
     python evaluate.py --model model_best.pth.tar --dataset shanghai --data data/ShanghaiTech/part_A/test_data --max-images 10
 """
 
@@ -59,7 +55,6 @@ def get_image_gt_pairs(dataset, data_dir, split='Test'):
     pairs = []
 
     if dataset == 'shanghai':
-        # ShanghaiTech: data_dir = .../part_A/test_data (or train_data)
         img_dir = os.path.join(data_dir, 'images')
         gt_dir = os.path.join(data_dir, 'ground-truth')
         image_paths = sorted(glob.glob(os.path.join(img_dir, 'IMG_*.jpg')))
@@ -71,7 +66,6 @@ def get_image_gt_pairs(dataset, data_dir, split='Test'):
                 pairs.append((img_path, gt_path))
 
     elif dataset == 'ucf-qnrf':
-        # UCF-QNRF: data_dir = .../UCF-QNRF_ECCV18, split = Test or Train
         split_dir = os.path.join(data_dir, split)
         image_paths = sorted(glob.glob(os.path.join(split_dir, 'img_*.jpg')))
         for img_path in image_paths:
@@ -89,7 +83,6 @@ def evaluate(model_path, dataset, data_dir, split='Test', device=None, max_image
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
     device = torch.device(device)
 
-    # Load model
     print(f"Loading model from {model_path}...")
     model = CSRNet(load_weights=True)
     checkpoint = torch.load(model_path, map_location=device, weights_only=False)
@@ -100,18 +93,22 @@ def evaluate(model_path, dataset, data_dir, split='Test', device=None, max_image
     model.to(device)
     model.eval()
 
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                             std=[0.229, 0.224, 0.225]),
-    ])
+    import torchvision.transforms.functional as F
+    
+    class CustomTransform:
+        def __call__(self, img):
+            img = 255.0 * F.to_tensor(img)
+            img[0,:,:] = img[0,:,:] - 92.8207477031
+            img[1,:,:] = img[1,:,:] - 95.2757037428
+            img[2,:,:] = img[2,:,:] - 104.877445883
+            return img
 
-    # Get image/GT pairs
+    transform = CustomTransform()
+
     pairs = get_image_gt_pairs(dataset, data_dir, split)
     if max_images is not None:
         pairs = pairs[:max_images]
 
-    # Choose GT loader
     load_gt = load_gt_shanghaitech if dataset == 'shanghai' else load_gt_ucfqnrf
 
     total = len(pairs)
@@ -149,7 +146,6 @@ def evaluate(model_path, dataset, data_dir, split='Test', device=None, max_image
 
         print(f"{idx+1:>4}  {img_name:<20}  {gt_count:>6}  {pred_count:>6}  {error:>+8}  {elapsed:>5.1f}s")
 
-    # Summary
     mae = np.mean(abs_errors)
     mse = np.mean(sq_errors)
     rmse = np.sqrt(mse)
