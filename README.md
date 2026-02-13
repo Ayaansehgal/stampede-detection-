@@ -21,14 +21,29 @@ A deep learning-based crowd counting and density estimation system using **CSRNe
 ## 📁 Project Structure
 
 ```
-├── model.py          # CSRNet architecture (VGG-16 frontend + dilated conv backend)
-├── predict.py        # Inference script — image → people count + density
-├── evaluate.py       # Accuracy evaluation (supports ShanghaiTech & UCF-QNRF)
-├── .gitignore
+Yantra/
+├── model.py                    # CSRNet architecture (VGG-16 frontend + dilated conv backend)
+├── predict.py                  # Inference: image → people count + density metrics
+├── evaluate.py                 # Accuracy evaluation (ShanghaiTech & UCF-QNRF)
 ├── README.md
-└── data/             # (not in repo — download separately)
+├── .gitignore
+│
+├── weights/                    # Model weights (not in repo — download separately)
+│   └── model_best.pth.tar      # Pretrained ShanghaiTech-A checkpoint (~130MB)
+│
+├── scripts/                    # Utility scripts
+│   └── gen_density_maps.py     # Batch density map generation
+│
+├── outputs/                    # Generated results (not in repo)
+│   └── density_maps/           # Density map visualizations
+│       ├── density_IMG_1.png
+│       └── ...
+│
+└── data/                       # Datasets (not in repo — download separately)
     ├── ShanghaiTech/
     │   ├── part_A/
+    │   │   ├── test_data/
+    │   │   └── train_data/
     │   └── part_B/
     └── UCF-QNRF_ECCV18/
 ```
@@ -43,12 +58,12 @@ pip install torch torchvision numpy scipy Pillow matplotlib h5py
 
 ### 2. Download Pretrained Weights
 
-Download the ShanghaiTech Part A weights (~130MB) from [Google Drive](https://drive.google.com/open?id=1Z-atzS5Y2pOd-nEWqZRVBDMYJDreGWHH) and place as `model_best.pth.tar` in the project root.
+Download the ShanghaiTech Part A weights (~130MB) from [Google Drive](https://drive.google.com/open?id=1Z-atzS5Y2pOd-nEWqZRVBDMYJDreGWHH) and place in `weights/model_best.pth.tar`.
 
 ### 3. Count People in an Image
 
 ```bash
-python predict.py --image path/to/crowd.jpg --model model_best.pth.tar
+python predict.py --image path/to/crowd.jpg
 ```
 
 **Output:**
@@ -64,7 +79,7 @@ python predict.py --image path/to/crowd.jpg --model model_best.pth.tar
 ### 4. Save Density Map Visualization
 
 ```bash
-python predict.py --image path/to/crowd.jpg --model model_best.pth.tar --save-density
+python predict.py --image path/to/crowd.jpg --save-density
 ```
 
 This saves a side-by-side comparison of the original image and density heatmap.
@@ -75,16 +90,16 @@ This saves a side-by-side comparison of the original image and density heatmap.
 
 ```bash
 # Full test set (182 images)
-python evaluate.py --model model_best.pth.tar --dataset shanghai --data data/ShanghaiTech/part_A/test_data
+python evaluate.py --dataset shanghai --data data/ShanghaiTech/part_A/test_data
 
 # Quick test (first N images)
-python evaluate.py --model model_best.pth.tar --dataset shanghai --data data/ShanghaiTech/part_A/test_data --max-images 10
+python evaluate.py --dataset shanghai --data data/ShanghaiTech/part_A/test_data --max-images 10
 ```
 
 ### On UCF-QNRF Dataset
 
 ```bash
-python evaluate.py --model model_best.pth.tar --dataset ucf-qnrf --data data/UCF-QNRF_ECCV18 --split Test
+python evaluate.py --dataset ucf-qnrf --data data/UCF-QNRF_ECCV18 --split Test
 ```
 
 ### Benchmark Results
@@ -100,7 +115,7 @@ python evaluate.py --model model_best.pth.tar --dataset ucf-qnrf --data data/UCF
 from predict import CrowdCounter
 
 # Initialize
-counter = CrowdCounter("model_best.pth.tar")
+counter = CrowdCounter("weights/model_best.pth.tar")
 
 # Get just the count
 count = counter.count("crowd.jpg")
@@ -134,4 +149,3 @@ print(f"Peak density: {result['density_peak']}")
 
 - [CSRNet Paper (arXiv)](https://arxiv.org/abs/1802.10062)
 - [CSRNet PyTorch Implementation](https://github.com/leeyeehoo/CSRNet-pytorch)
-- [CrowdEstimation Reference Repo](https://github.com/Tikam02/CrowdEstimation)

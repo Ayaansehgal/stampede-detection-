@@ -1,13 +1,20 @@
 """Generate density maps for ShanghaiTech images 1-10."""
+import sys
+import os
+
+# Allow imports from project root
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from PIL import Image
-import os
 from predict import CrowdCounter
 
-counter = CrowdCounter('model_best.pth.tar')
-imgs_dir = r'data/ShanghaiTech/part_A/test_data/images'
+counter = CrowdCounter(os.path.join('..', 'weights', 'model_best.pth.tar'))
+imgs_dir = os.path.join('..', 'data', 'ShanghaiTech', 'part_A', 'test_data', 'images')
+out_dir = os.path.join('..', 'outputs', 'density_maps')
+os.makedirs(out_dir, exist_ok=True)
 
 for i in range(1, 11):
     img_path = os.path.join(imgs_dir, f'IMG_{i}.jpg')
@@ -27,7 +34,7 @@ for i in range(1, 11):
     axes[1].axis('off')
     plt.colorbar(im, ax=axes[1], fraction=0.046, pad=0.04)
 
-    out_path = f'density_IMG_{i}.png'
+    out_path = os.path.join(out_dir, f'density_IMG_{i}.png')
     plt.tight_layout()
     plt.savefig(out_path, dpi=150, bbox_inches='tight')
     plt.close()

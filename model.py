@@ -3,21 +3,10 @@ import torch
 from torchvision import models
 
 
-class CSRNet(nn.Module):
-    """
-    CSRNet: Dilated Convolutional Neural Networks for Understanding
-    the Highly Congested Scenes (CVPR 2018).
-
-    Architecture:
-        Frontend: VGG-16 (first 10 conv layers + 3 maxpool)
-        Backend:  Dilated convolutions (dilation=2)
-        Output:   Single-channel density map
-
-    To get people count: output.sum()
-    """
+class CrowdStampedeYantra(nn.Module):
 
     def __init__(self, load_weights=False):
-        super(CSRNet, self).__init__()
+        super(CrowdStampedeYantra, self).__init__()
         self.seen = 0
         self.frontend_feat = [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512]
         self.backend_feat = [512, 512, 512, 256, 128, 64]
@@ -26,10 +15,8 @@ class CSRNet(nn.Module):
         self.output_layer = nn.Conv2d(64, 1, kernel_size=1)
 
         if not load_weights:
-            # Initialize with VGG-16 pretrained weights for the frontend
             mod = models.vgg16(weights=models.VGG16_Weights.IMAGENET1K_V1)
             self._initialize_weights()
-            # Copy VGG-16 frontend weights
             frontend_state = list(self.frontend.state_dict().items())
             vgg_state = list(mod.state_dict().items())
             for i in range(len(frontend_state)):

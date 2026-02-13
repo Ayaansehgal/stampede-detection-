@@ -1,10 +1,13 @@
 # Model weights (too large for GitHub)
-*.pth.tar
-*.pth
-*.h5
+weights/*.pth.tar
+weights/*.pth
+weights/*.h5
 
 # Dataset (too large for GitHub)
 data/
+
+# Generated outputs
+outputs/
 
 # Python
 __pycache__/
@@ -13,6 +16,10 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+
+# Temp files
+*.txt
+!README.md
 
 # IDE
 .vscode/
