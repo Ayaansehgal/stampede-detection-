@@ -1,9 +1,8 @@
-"""Generate density maps for ShanghaiTech images 1-10."""
 import sys
 import os
 
-# Allow imports from project root
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, PROJECT_ROOT)
 
 import matplotlib
 matplotlib.use('Agg')
@@ -11,9 +10,9 @@ import matplotlib.pyplot as plt
 from PIL import Image
 from predict import CrowdCounter
 
-counter = CrowdCounter(os.path.join('..', 'weights', 'model_best.pth.tar'))
-imgs_dir = os.path.join('..', 'data', 'ShanghaiTech', 'part_A', 'test_data', 'images')
-out_dir = os.path.join('..', 'outputs', 'density_maps')
+counter = CrowdCounter(os.path.join(PROJECT_ROOT, 'weights', 'model_best.pth.tar'))
+imgs_dir = os.path.join(PROJECT_ROOT, 'data', 'ShanghaiTech', 'part_A', 'test_data', 'images')
+out_dir = os.path.join(PROJECT_ROOT, 'outputs', 'density_maps')
 os.makedirs(out_dir, exist_ok=True)
 
 for i in range(1, 11):
