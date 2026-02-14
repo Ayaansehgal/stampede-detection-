@@ -64,5 +64,10 @@ def predict_risk(feature_sequence):
         output = model(input_tensor)
         risk_score = torch.sigmoid(output).item()
         
-    label = "SHOCKWAVE" if risk_score > 0.75 else "SAFE"
+    if risk_score > 0.7:
+        label = "SHOCKWAVE"
+    elif risk_score > 0.4:
+        label = "ELEVATED"
+    else:
+        label = "SAFE"
     return risk_score, label

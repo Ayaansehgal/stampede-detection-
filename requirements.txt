@@ -8,3 +8,4 @@ uvicorn
 pyserial
 Pillow
 requests
+opencv-python
