@@ -9,3 +9,8 @@ pyserial
 Pillow
 requests
 opencv-python
+tensorflow
+tensorflow_hub
+sounddevice
+web3
+py-solc-x

@@ -1,26 +1,31 @@
-# Init
+# --- Python / Environment ---
 __pycache__/
 *.pyc
+venv/
+env/
+.env
+.vscode/
+.idea/
 
-# Data
+# --- Data & Logs ---
 data/
+server/events/
 synthetic_data/
-synthetic_data.json
-synthetic_crowd_data.json
-*.json
 
-# Models (Large files)
-models/model_csrnet.pth
-*.pth.tar
-*.h5
+# Do NOT ignore the ledger (as requested)
+!blockchain_ledger.jsonl
 
-# Keep small models
+# --- Models ---
+# Ignore large model folder downloads
+models/yamnet/
+models/*.h5
+models/*.tar
+models/*.zip
+
+# Keep our trained lightweight models
 !models/gru_shockwave_model.pth
 !models/feature_scaler.pkl
 
-# Environment
-.env
-venv/
-env/
-.vscode/
-.idea/
+# --- Temporary / Generated ---
+*.log
+block_chain.json (if any old one exists)

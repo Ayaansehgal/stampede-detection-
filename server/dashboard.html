@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stampede Detection Dashboard</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #121212; color: #e0e0e0; margin: 0; padding: 20px; }
+        h1 { color: #bb86fc; text-align: center; }
+        
+        .status-box {
+            background-color: #1e1e1e;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        
+        #current-status { font-size: 3em; font-weight: bold; }
+        .SAFE { color: #03dac6; }
+        .ELEVATED { color: #ffb74d; }
+        .SHOCKWAVE { color: #cf6679; animation: blink 1s infinite; }
+        
+        @keyframes blink { 50% { opacity: 0.5; } }
+        
+        table { width: 100%; border-collapse: collapse; background-color: #1e1e1e; border-radius: 8px; overflow: hidden; }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #333; }
+        th { background-color: #333; color: #bb86fc; }
+        tr:hover { background-color: #2c2c2c; }
+        
+        .log-container {
+            max-height: 500px;
+            overflow-y: auto;
+            border: 1px solid #333;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Stampede Detection System</h1>
+    
+    <div class="status-box">
+        <div>Current Crowd Status</div>
+        <div id="current-status" class="SAFE">WAITING...</div>
+        <div id="latest-score" style="font-size: 1.2em; margin-top: 10px;">Risk Score: 0.00</div>
+    </div>
+
+    <h3>Blockchain Event Log</h3>
+    <div class="log-container">
+        <table id="events-table">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Label</th>
+                    <th>Risk Score</th>
+                    <th>Hash (Blockchain)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Rows will be inserted here -->
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        async function fetchEvents() {
+            try {
+                const response = await fetch('/events');
+                const events = await response.json();
+                
+                const tbody = document.querySelector("#events-table tbody");
+                tbody.innerHTML = ""; // Clear existing
+                
+                if (events.length > 0) {
+                    // Update Status Box with most recent event
+                    const latest = events[events.length - 1];
+                    const statusDiv = document.getElementById("current-status");
+                    statusDiv.textContent = latest.label;
+                    statusDiv.className = latest.label;
+                    
+                    document.getElementById("latest-score").textContent = 
+                        `Risk Score: ${latest.risk_score.toFixed(4)} | Audio: ${latest.audio_risk?.toFixed(2) || '0.00'}`;
+                }
+
+                // Populate Table (Reverse order to show newest first)
+                events.slice().reverse().forEach(event => {
+                    const tr = document.createElement("tr");
+                    tr.innerHTML = `
+                        <td>${new Date(event.timestamp * 1000).toLocaleTimeString()}</td>
+                        <td style="color: ${getColor(event.label)}">${event.label}</td>
+                        <td>${event.risk_score.toFixed(4)}</td>
+                        <td style="font-family: monospace; font-size: 0.9em; color: #888;">${event.hash.substring(0, 20)}...</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (e) {
+                console.error("Error fetching events:", e);
+            }
+        }
+        
+        function getColor(label) {
+            if (label === 'SHOCKWAVE') return '#cf6679';
+            if (label === 'ELEVATED') return '#ffb74d';
+            return '#03dac6';
+        }
+
+        // Poll every 1 second
+        setInterval(fetchEvents, 1000);
+        fetchEvents();
+    </script>
+</body>
+</html>

@@ -53,8 +53,10 @@ def predict_risk(feature_sequence):
     if model is None or scaler is None:
         return 0.0, "MODEL_NOT_READY"
         
-    if feature_sequence.shape != (20, 7):
-        return 0.0, "BUFFER_NOT_FULL"
+    if feature_sequence.shape[0] < 20:
+        # Pad with the last frame (repeat) to fill up to 20
+        padding = np.tile(feature_sequence[-1], (20 - feature_sequence.shape[0], 1))
+        feature_sequence = np.vstack([feature_sequence, padding])
     
     features_scaled = scaler.transform(feature_sequence)
     

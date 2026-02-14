@@ -1,0 +1,10 @@
+{
+    "ts": 1710000000.0,
+    "density": 0.95,
+    "mean_speed": 5.0,
+    "speed_variance": 3.0,
+    "radial_spread": 0.9,
+    "density_gradient": 0.8,
+    "acceleration": 2.0,
+    "flux": 200.0
+}

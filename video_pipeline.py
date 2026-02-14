@@ -7,6 +7,43 @@ import argparse
 from PIL import Image
 from predict import CrowdCounter
 
+try:
+    from picamera.array import PiRGBArray
+    from picamera import PiCamera
+    PICAMERA_AVAILABLE = True
+except ImportError:
+    PICAMERA_AVAILABLE = False
+
+class PiCameraStream:
+    def __init__(self, resolution=(640, 480), framerate=32):
+        self.camera = PiCamera()
+        self.camera.resolution = resolution
+        self.camera.framerate = framerate
+        self.rawCapture = PiRGBArray(self.camera, size=resolution)
+        self.stream = self.camera.capture_continuous(self.rawCapture,
+            format="bgr", use_video_port=True)
+        self.frame = None
+        self.stopped = False
+
+    def start(self):
+        # start input thread (not implemented here for simplicity, using blocking read)
+        return self
+
+    def read(self):
+        # We need to simulate the blocking behavior of cv2.VideoCapture.read()
+        # capture_continuous is a generator
+        try:
+           frame = next(self.stream)
+           image = frame.array
+           self.rawCapture.truncate(0) 
+           return True, image
+        except Exception as e:
+           print(f"PiCamera Error: {e}")
+           return False, None
+
+    def release(self):
+        self.camera.close()
+
 # --- CONFIG ---
 SERVER_URL = "http://localhost:8000/ingest"
 MODEL_PATH = "models/model_csrnet.pth"
@@ -73,14 +110,24 @@ def compute_radial_spread(flow, motion_mask):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--source", type=str, default="0", help="Video source (0 for webcam, or path to mp4)")
+    parser.add_argument("--picamera", action="store_true", help="Use Raspberry Pi Camera Module")
     args = parser.parse_args()
 
     # Hardware (Camera)
-    source = int(args.source) if args.source.isdigit() else args.source
-    cap = cv2.VideoCapture(source)
-    if not cap.isOpened():
-        print(f"Error: Could not open video source {source}")
-        return
+    if args.picamera:
+        if not PICAMERA_AVAILABLE:
+            print("Error: picamera library not found. Install with 'pip install picamera'")
+            return
+        print("Initializing Pi Camera...")
+        cap = PiCameraStream(resolution=(RESIZE_W, RESIZE_H))
+        # Warmup
+        time.sleep(2.0)
+    else:
+        source = int(args.source) if args.source.isdigit() else args.source
+        cap = cv2.VideoCapture(source)
+        if not cap.isOpened():
+            print(f"Error: Could not open video source {source}")
+            return
 
     # Model (Vision)
     print("Loading Vision Model...")
