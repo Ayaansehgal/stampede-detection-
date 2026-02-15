@@ -2,7 +2,6 @@ import torch.nn as nn
 import torch
 from torchvision import models
 
-
 class CrowdStampedeYantra(nn.Module):
 
     def __init__(self, load_weights=False):
@@ -37,7 +36,6 @@ class CrowdStampedeYantra(nn.Module):
             elif isinstance(m, nn.BatchNorm2d):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
-
 
 def make_layers(cfg, in_channels=3, batch_norm=False, dilation=False):
     d_rate = 2 if dilation else 1

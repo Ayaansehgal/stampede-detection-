@@ -10,7 +10,6 @@ from .state_manager import StateManager
 
 app = FastAPI()
 
-# Allow CORS for local testing if needed
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -25,6 +24,16 @@ async def read_dashboard():
     with open("server/dashboard.html", "r") as f:
         return f.read()
 
+@app.get("/status")
+async def get_status():
+
+    return {
+        "label": state_manager.last_label,
+        "risk_score": state_manager.last_risk,
+        "audio_risk": state_manager.last_audio_risk,
+        "timestamp": state_manager.last_ts,
+    }
+
 @app.get("/events")
 async def get_events():
     events = []
@@ -36,7 +45,7 @@ async def get_events():
                         events.append(json.loads(line))
                     except:
                         pass
-    # Return last 50 events
+
     return events[-50:]
 
 @app.post("/ingest_audio")
@@ -49,53 +58,43 @@ async def ingest_audio(data: dict):
 @app.post("/ingest")
 async def ingest(data: dict):
 
-    # file_path = store_event(data) # Moved to end
-
     feature_cols = ["density", "mean_speed", "speed_variance", "radial_spread", "density_gradient", "acceleration", "flux"]
-    
+
     try:
         current_features = [float(data.get(c, 0.0)) for c in feature_cols]
     except ValueError:
         return {"status": "error", "message": "Invalid feature values"}
 
     state_manager.add_frame(current_features)
-    
+
     feature_window = state_manager.get_buffer()
-    
-    # 1. Visual/GRU Risk
+
     if feature_window is not None:
         visual_risk, visual_label = predict_risk(feature_window)
     else:
         visual_risk = 0.0
         visual_label = "BUFFERING"
 
-    # 2. Audio Risk
     current_ts = data.get("ts", 0.0)
     audio_risk = state_manager.get_audio_risk(current_ts)
-    
-    # 3. Sensor Fusion Logic
-    # Weighted average: 70% Visual (more reliable for spatial), 30% Audio (confirmatory)
+
     combined_score = (0.7 * visual_risk) + (0.3 * audio_risk)
-    
-    # Boost: If BOTH provide strong signals, amplify the risk
+
     if visual_risk > 0.4 and audio_risk > 0.6:
-        combined_score = max(combined_score, 0.75) # Force into SHOCKWAVE territory
-    
-    # Final Decision
+        combined_score = max(combined_score, 0.75)
+
     if combined_score > 0.7:
         final_label = "SHOCKWAVE"
     elif combined_score > 0.4:
         final_label = "ELEVATED"
     else:
         final_label = "SAFE"
-        
-    # Override if buffering
+
     if visual_label == "BUFFERING":
         final_label = "BUFFERING"
-        # We KEEP the calc score for debugging, but set label to BUFFERING
-        # combined_score = 0.0  <-- Removed this so we can see the potential score in logs
 
-    # Perform Logging
+    state_manager.set_live_status(final_label, combined_score, audio_risk, data.get("ts", 0.0))
+
     if state_manager.should_log(final_label):
         event_payload = {
             "timestamp": data.get("ts"),
@@ -103,22 +102,26 @@ async def ingest(data: dict):
             "visual_risk": visual_risk,
             "audio_risk": audio_risk,
             "label": final_label,
-            # "file_path": file_path # We'll get this in a sec
+
         }
         event_hash = generate_hash(event_payload)
         event_payload["hash"] = event_hash
         log_to_blockchain(event_payload)
 
-    # Prepare Response Data
+    pi_status = "alert" if final_label in ["SHOCKWAVE", "ELEVATED"] else "ok"
+
     response_data = {
         "risk_score": combined_score,
         "visual_score": visual_risk,
         "audio_score": audio_risk,
         "label": final_label,
-        "status": "processed"
+        "status": "processed",
+
+        "pi_status": pi_status,
+        "confidence": combined_score,
+        "timestamp": data.get("ts")
     }
-    
-    # Store complete event (Input + Output)
+
     full_log = data.copy()
     full_log.update(response_data)
     store_event(full_log)

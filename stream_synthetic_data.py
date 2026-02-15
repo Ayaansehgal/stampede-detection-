@@ -4,76 +4,125 @@ import requests
 import glob
 import os
 import random
+import argparse
 
 SERVER_URL = "http://localhost:8000"
+DATA_DIR = "synthetic_data"
 
-def stream_synthetic_data():
+def _find_scenario_files(data_dir=None):
+    d = data_dir or DATA_DIR
+    files = sorted(glob.glob(os.path.join(d, "scenario_*.json")))
+    files += sorted(glob.glob(os.path.join(d, "sim_*.json")))
+    return files
+
+def _pick_panic_scenario(files):
+
+    for path in files:
+        try:
+            with open(path, "r") as f:
+                data = json.load(f)
+            if any(isinstance(d, dict) and d.get("label") == "SHOCKWAVE" for d in (data if isinstance(data, list) else [data])):
+                return path
+        except Exception:
+            continue
+    return None
+
+def _generate_panic_scenario():
+
+    import simulation
+    sim = simulation.Simulation()
+    sim.reset_scenario("panic")
+    return sim.run_scenario(200, "panic")
+
+def stream_synthetic_data(scenario_index=0, panic=False, server_url=None, data_dir=None):
+    server_url = server_url or SERVER_URL
+    data_dir = data_dir or DATA_DIR
     print("=== Streaming Synthetic Data to Server ===")
-    
-    # Quick check if server is up
+
+    base_check = (server_url or "").rstrip("/").replace("/ingest", "").replace("/ingest_audio", "") or server_url
     try:
-        requests.get(f"{SERVER_URL}/")
+        requests.get(base_check, timeout=2)
         print("Server is reachable.")
-    except:
-        print(f"Error: Server not running at {SERVER_URL}. Please run 'server/main.py' or 'run_all.py' first.")
+    except Exception:
+        print(f"Error: Server not running at {server_url}. Please run 'server/main.py' or 'run_all.py' first.")
         return
 
-    # Find JSON files
-    files = sorted(glob.glob("synthetic_data/scenario_*.json"))
-    if not files:
-        print("No synthetic data found in 'synthetic_data/'. Running simulation first...")
-        import simulation
-        sim = simulation.Simulation()
-        sim.reset_scenario("panic")
-        data = sim.run_scenario(200, "panic")
-        with open("synthetic_data/scenario_test.json", "w") as f:
-            json.dump(data, f)
-        files = ["synthetic_data/scenario_test.json"]
+    scenario_data = None
+    scenario_path = None
 
-    print(f"Found {len(files)} scenarios. Playing the first one...")
-    
-    with open(files[0], "r") as f:
-        scenario_data = json.load(f)
-        
+    if panic:
+        os.makedirs(data_dir, exist_ok=True)
+        files = _find_scenario_files(data_dir)
+        scenario_path = _pick_panic_scenario(files)
+        if scenario_path:
+            with open(scenario_path, "r") as f:
+                scenario_data = json.load(f)
+            print(f"Playing SHOCKWAVE scenario: {scenario_path}")
+        else:
+            print("No existing panic scenario found. Generating panic scenario...")
+            scenario_data = _generate_panic_scenario()
+            scenario_path = os.path.join(data_dir, "scenario_panic_live.json")
+            with open(scenario_path, "w") as f:
+                json.dump(scenario_data, f)
+            print("Generated and playing panic (SHOCKWAVE) scenario.")
+    else:
+        files = _find_scenario_files(data_dir)
+        if not files:
+            print("No synthetic data found. Generating one panic scenario as fallback...")
+            os.makedirs(data_dir, exist_ok=True)
+            scenario_data = _generate_panic_scenario()
+            scenario_path = os.path.join(data_dir, "scenario_test.json")
+            with open(scenario_path, "w") as f:
+                json.dump(scenario_data, f)
+        else:
+            idx = min(scenario_index, len(files) - 1)
+            scenario_path = files[idx]
+            with open(scenario_path, "r") as f:
+                scenario_data = json.load(f)
+            print(f"Found {len(files)} scenarios. Playing #{idx}: {os.path.basename(scenario_path)}")
+
+    if not scenario_data:
+        print("No scenario data to play.")
+        return
+    base = server_url.rstrip("/")
+    if base.endswith("/ingest"):
+        base = base.replace("/ingest", "")
     print(f"Loaded scenario with {len(scenario_data)} frames.")
     print("Press Ctrl+C to stop.\n")
-    
+
     try:
         for i, frame in enumerate(scenario_data):
-            # 1. Simulate Audio Risk based on Visual Label (for testing fusion)
-            # If visual says SHOCKWAVE, make audio high too (with some noise)
+
             is_shockwave = frame.get("label") == "SHOCKWAVE"
             if is_shockwave:
                 audio_risk = random.uniform(0.6, 0.95)
             else:
                 audio_risk = random.uniform(0.0, 0.3)
-                
-            # Send Audio
             try:
-                requests.post(f"{SERVER_URL}/ingest_audio", json={
-                    "ts": time.time(),
-                    "audio_risk": audio_risk
-                }, timeout=0.1)
-            except: pass
+                requests.post(f"{base}/ingest_audio", json={"ts": time.time(), "audio_risk": audio_risk}, timeout=0.2)
+            except Exception:
+                pass
 
-            # 2. Send Visual Features (GRU Input)
             payload = frame.copy()
             payload["ts"] = time.time()
-            
             try:
-                resp = requests.post(f"{SERVER_URL}/ingest", json=payload, timeout=0.1)
+                resp = requests.post(f"{base}/ingest", json=payload, timeout=0.5)
                 data = resp.json()
-                
-                # feedback
+
                 print(f"Frame {i:03d} | VisRisk: {frame['label']} ({frame.get('is_shockwave')}) -> Server: {data.get('label')} | Score: {data.get('risk_score'):.2f}")
             except Exception as e:
                 print(f"Error making request: {e}")
 
-            # Sleep to mimic real-time (0.1s per frame)
             time.sleep(0.1)
-            
+
     except KeyboardInterrupt:
         print("\nStopped.")
 
 if __name__ == "__main__":
-    stream_synthetic_data()
+    parser = argparse.ArgumentParser(description="Stream synthetic visual + audio data to stampede server")
+    parser.add_argument("--panic", "--shockwave", dest="panic", action="store_true", help="Run a SHOCKWAVE/panic scenario")
+    parser.add_argument("--scenario", type=int, default=0, metavar="N", help="Scenario index to play (default: 0)")
+    parser.add_argument("--server", type=str, default=SERVER_URL, help="Server base URL")
+    parser.add_argument("--data-dir", type=str, default=DATA_DIR, help="Directory with scenario_*.json files")
+    args = parser.parse_args()
+    stream_synthetic_data(scenario_index=args.scenario, panic=args.panic, server_url=args.server, data_dir=args.data_dir)

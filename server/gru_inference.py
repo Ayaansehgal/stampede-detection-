@@ -36,7 +36,7 @@ def load_resources():
             print("GRU Model Loaded")
         else:
             print(f"Warning: {MODEL_PATH} not found")
-    
+
     if scaler is None:
         if os.path.exists(SCALER_PATH):
             scaler = joblib.load(SCALER_PATH)
@@ -45,27 +45,25 @@ def load_resources():
             print(f"Warning: {SCALER_PATH} not found")
 
 def predict_risk(feature_sequence):
-    """
-    feature_sequence: numpy array of shape (20, 7)
-    """
+
     load_resources()
-    
+
     if model is None or scaler is None:
         return 0.0, "MODEL_NOT_READY"
-        
+
     if feature_sequence.shape[0] < 20:
-        # Pad with the last frame (repeat) to fill up to 20
+
         padding = np.tile(feature_sequence[-1], (20 - feature_sequence.shape[0], 1))
         feature_sequence = np.vstack([feature_sequence, padding])
-    
+
     features_scaled = scaler.transform(feature_sequence)
-    
+
     input_tensor = torch.tensor(features_scaled, dtype=torch.float32).unsqueeze(0).to(DEVICE)
-    
+
     with torch.no_grad():
         output = model(input_tensor)
         risk_score = torch.sigmoid(output).item()
-        
+
     if risk_score > 0.7:
         label = "SHOCKWAVE"
     elif risk_score > 0.4:

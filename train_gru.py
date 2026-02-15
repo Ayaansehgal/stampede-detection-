@@ -10,9 +10,8 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 
-
 DATA_DIR = "synthetic_data"
-SEQ_LEN = 20                 # 200 frames → 20-step windows works well
+SEQ_LEN = 20
 BATCH_SIZE = 64
 EPOCHS = 25
 LR = 1e-3
@@ -28,7 +27,6 @@ FEATURE_COLUMNS = [
     "flux"
 ]
 
-
 class ShockwaveDataset(Dataset):
     def __init__(self, X, y):
         self.X = torch.tensor(X, dtype=torch.float32)
@@ -39,7 +37,6 @@ class ShockwaveDataset(Dataset):
 
     def __getitem__(self, idx):
         return self.X[idx], self.y[idx]
-
 
 class GRUClassifier(nn.Module):
     def __init__(self, input_size, hidden_size=64):
@@ -52,7 +49,6 @@ class GRUClassifier(nn.Module):
         out, _ = self.gru(x)
         out = out[:, -1, :]
         return self.fc(out).squeeze(1)
-
 
 def load_scenarios():
     all_sequences = []
@@ -84,7 +80,6 @@ def load_scenarios():
             all_labels.append(label)
 
     return np.array(all_sequences), np.array(all_labels)
-
 
 def main():
 
@@ -166,7 +161,6 @@ def main():
 
     torch.save(model.state_dict(), "gru_shockwave_model.pth")
     print("\nModel saved as gru_shockwave_model.pth")
-
 
 if __name__ == "__main__":
     main()

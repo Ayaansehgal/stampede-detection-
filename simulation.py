@@ -14,8 +14,6 @@ TAU = 0.5
 A_SOC, B_SOC = 2.0, 0.08
 K_AG = 1.2e5
 
-
-
 class Agent:
     def __init__(self, x, y, goal_x, goal_y):
         self.pos = np.array([x, y], dtype=float)
@@ -60,7 +58,6 @@ class Agent:
             self.vel = self.vel / speed * MAX_SPEED
         self.pos += self.vel * DT
 
-
 class Simulation:
     def __init__(self):
         self.agents = []
@@ -71,7 +68,7 @@ class Simulation:
         if scenario_type == "safe":
             num_agents = random.randint(40, 70)
 
-        else:  # panic
+        else:
             num_agents = random.randint(70, 120)
 
         for _ in range(num_agents):
@@ -169,7 +166,6 @@ class Simulation:
             })
 
         return scenario_data
-
 
 if __name__ == "__main__":
 

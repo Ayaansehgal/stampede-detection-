@@ -1,31 +1,35 @@
 # --- Python / Environment ---
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
 venv/
 env/
 .env
 .vscode/
 .idea/
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
 
 # --- Data & Logs ---
 data/
 server/events/
 synthetic_data/
-
-# Do NOT ignore the ledger (as requested)
-!blockchain_ledger.jsonl
+test_data/
+demo_data/
+blockchain_ledger.jsonl
+shockwave_payload.json
 
 # --- Models ---
-# Ignore large model folder downloads
-models/yamnet/
-models/*.h5
-models/*.tar
-models/*.zip
-
-# Keep our trained lightweight models
+models/
 !models/gru_shockwave_model.pth
 !models/feature_scaler.pkl
 
 # --- Temporary / Generated ---
 *.log
-block_chain.json (if any old one exists)
+block_chain.json
+temp/
+tmp/

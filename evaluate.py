@@ -1,23 +1,3 @@
-"""
-Accuracy Evaluation Script for CSRNet
-======================================
-Evaluates the pretrained model against ground truth annotations.
-Supports both ShanghaiTech and UCF-QNRF datasets.
-
-Metrics computed:
-    - MAE  (Mean Absolute Error)
-    - MSE  (Mean Squared Error)
-    - RMSE (Root Mean Squared Error)
-
-Usage:
-    python evaluate.py --model model_best.pth.tar --dataset shanghai --data data/ShanghaiTech/part_A/test_data
-
-    python evaluate.py --model model_best.pth.tar --dataset shanghai --data data/ShanghaiTech/part_B/test_data
-
-    python evaluate.py --model model_best.pth.tar --dataset ucf-qnrf --data data/UCF-QNRF_ECCV18 --split Test
-
-    python evaluate.py --model model_best.pth.tar --dataset shanghai --data data/ShanghaiTech/part_A/test_data --max-images 10
-"""
 
 import argparse
 import os
@@ -32,26 +12,19 @@ from PIL import Image
 
 from model import CSRNet
 
-
 def load_gt_shanghaitech(ann_path):
-    """Load ground truth from ShanghaiTech .mat file.
-    Structure: image_info[0][0][0][0][0] -> (N, 2) array of head locations."""
+
     mat = scipy.io.loadmat(ann_path)
     locations = mat['image_info'][0][0][0][0][0]
     return locations.shape[0]
 
-
 def load_gt_ucfqnrf(ann_path):
-    """Load ground truth from UCF-QNRF .mat file.
-    Structure: annPoints -> (N, 2) array of head locations."""
+
     mat = scipy.io.loadmat(ann_path)
     return mat['annPoints'].shape[0]
 
-
 def get_image_gt_pairs(dataset, data_dir, split='Test'):
-    """
-    Returns list of (image_path, gt_ann_path) tuples for the given dataset.
-    """
+
     pairs = []
 
     if dataset == 'shanghai':
@@ -59,8 +32,8 @@ def get_image_gt_pairs(dataset, data_dir, split='Test'):
         gt_dir = os.path.join(data_dir, 'ground-truth')
         image_paths = sorted(glob.glob(os.path.join(img_dir, 'IMG_*.jpg')))
         for img_path in image_paths:
-            img_name = os.path.basename(img_path)  # IMG_1.jpg
-            gt_name = 'GT_' + img_name.replace('.jpg', '.mat')  # GT_IMG_1.mat
+            img_name = os.path.basename(img_path)
+            gt_name = 'GT_' + img_name.replace('.jpg', '.mat')
             gt_path = os.path.join(gt_dir, gt_name)
             if os.path.exists(gt_path):
                 pairs.append((img_path, gt_path))
@@ -76,7 +49,6 @@ def get_image_gt_pairs(dataset, data_dir, split='Test'):
                 pairs.append((img_path, ann_path))
 
     return pairs
-
 
 def evaluate(model_path, dataset, data_dir, split='Test', device=None, max_images=None):
     if device is None:
@@ -94,7 +66,7 @@ def evaluate(model_path, dataset, data_dir, split='Test', device=None, max_image
     model.eval()
 
     import torchvision.transforms.functional as F
-    
+
     class CustomTransform:
         def __call__(self, img):
             img = 255.0 * F.to_tensor(img)
@@ -171,7 +143,6 @@ def evaluate(model_path, dataset, data_dir, split='Test', device=None, max_image
     print()
     return mae, mse, rmse
 
-
 def main():
     parser = argparse.ArgumentParser(description='Evaluate CSRNet accuracy')
     parser.add_argument('--model', '-m', required=True, help='Path to model checkpoint')
@@ -184,7 +155,6 @@ def main():
     args = parser.parse_args()
 
     evaluate(args.model, args.dataset, args.data, args.split, args.device, args.max_images)
-
 
 if __name__ == '__main__':
     main()

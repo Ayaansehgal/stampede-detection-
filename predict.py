@@ -8,7 +8,6 @@ import numpy as np
 
 from model import CrowdStampedeYantra
 
-
 class CrowdCounter:
 
     def __init__(self, model_path, device=None):
@@ -64,7 +63,6 @@ class CrowdCounter:
     def count(self, image_input):
         return self.predict(image_input)['count']
 
-
 def main():
     parser = argparse.ArgumentParser(description='Count people in a crowd image')
     parser.add_argument('--image', '-i', required=True, help='Path to input image')
@@ -108,7 +106,6 @@ def main():
             print(f"  Density map saved to: {out_path}\n")
         except ImportError:
             print("  Install matplotlib to save density maps: pip install matplotlib\n")
-
 
 if __name__ == '__main__':
     main()
